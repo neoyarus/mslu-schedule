@@ -341,7 +341,15 @@
         updateOnlineStatus();
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Use HTTP explicitly for API endpoints
+            // Move all DOM element references to the top
+            const facultySelect = document.getElementById('faculty');
+            const groupSelect = document.getElementById('group');
+            const weekTypeSelect = document.getElementById('weekType');
+            const getScheduleBtn = document.getElementById('getSchedule');
+            const scheduleContainer = document.getElementById('schedule');
+            const loadingMessage = document.getElementById('loadingMessage');
+
+            // Constants
             const API_BASE = 'http://schedule.mslu.by/backend';
             const SITE_URL = 'http://schedule.mslu.by';
 
@@ -349,109 +357,53 @@
                 const queryString = Object.entries(params)
                     .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
                     .join('&');
-                        
                 const url = `${API_BASE}${endpoint}?${queryString}`;
                 
-                // For HTTP requests from HTTPS page, use a simple form submission in an iframe
-                if (window.location.protocol === 'https:') {
-                    return new Promise((resolve, reject) => {
-                        const iframe = document.createElement('iframe');
-                        iframe.style.display = 'none';
-                        document.body.appendChild(iframe);
-                        
-                        const form = iframe.contentDocument.createElement('form');
-                        form.method = 'GET';
-                        form.action = url;
-                        
-                        iframe.contentDocument.body.appendChild(form);
-                        form.submit();
-                        
-                        iframe.onload = async () => {
-                            try {
-                                const response = iframe.contentDocument.body.textContent;
-                                document.body.removeChild(iframe);
-                                resolve(JSON.parse(response));
-                            } catch (error) {
-                                reject(error);
-                            }
-                        };
-                    });
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const data = await response.json();
+                    return data;
+                } catch (error) {
+                    console.error('API fetch error:', error);
+                    throw error;
                 }
-                
-                // If we're on HTTP already, just do a regular fetch
-                const response = await fetch(url, {
-                    method: 'GET',
-                    headers: {
-                        'accept': '*/*',
-                        'accept-language': 'en,en-GB;q=0.9'
-                    }
-                });
-
-                if (!response.ok) throw new Error('Network response was not ok');
-                return response.json();
             }
 
-            // Add storage functions
-            function saveToStorage(key, value) {
-                localStorage.setItem(key, JSON.stringify(value));
+            async function loadFaculties() {
+                loadingMessage.textContent = 'Loading faculties...';
+                try {
+                    const response = await fetch(`${SITE_URL}/backend/getFaculties`);
+                    if (!response.ok) throw new Error('Failed to load faculties');
+                    const data = await response.json();
+                    
+                    groupSelect.innerHTML = '<option value="">Select Group</option>';
+                    facultySelect.innerHTML = '<option value="">Select Faculty</option>';
+                    
+                    data.forEach(faculty => {
+                        const option = document.createElement('option');
+                        option.value = faculty.id;
+                        option.textContent = faculty.name;
+                        facultySelect.appendChild(option);
+                    });
+                    
+                    loadingMessage.textContent = '';
+                } catch (error) {
+                    console.error('Failed to load faculties:', error);
+                    loadingMessage.textContent = 'Error loading faculties. Using fallback data.';
+                }
             }
 
-            function loadFromStorage(key) {
-                const data = localStorage.getItem(key);
-                return data ? JSON.parse(data) : null;
-            }
-
-            async function loadSavedState() {
+            // Load saved state after loading faculties
+            loadFaculties().then(() => {
                 const savedFacultyId = loadFromStorage('selectedFaculty');
-                const savedGroupId = loadFromStorage('selectedGroup');
-                const savedSchedule = loadFromStorage('lastSchedule');
-
                 if (savedFacultyId) {
                     facultySelect.value = savedFacultyId;
-                    // Load groups for this faculty
-                    try {
-                        const result = await fetchFromApi('/buttonClicked', {
-                            facultyId: savedFacultyId,
-                            educationForm: 1
-                        });
-                        
-                        groupSelect.innerHTML = '<option value="">Select Group</option>';
-                        result.data.forEach(group => {
-                            const option = document.createElement('option');
-                            option.value = group.IdGroup;
-                            option.textContent = group.Name;
-                            groupSelect.appendChild(option);
-                        });
-
-                        if (savedGroupId) {
-                            groupSelect.value = savedGroupId;
-                            // Try to load fresh schedule
-                            try {
-                                const result = await fetchFromApi('/', {
-                                    groupId: savedGroupId,
-                                    weekType: weekTypeSelect.value
-                                });
-                                displaySchedule(result.data);
-                                saveToStorage('lastSchedule', result.data);
-                            } catch (error) {
-                                // If server fetch fails, use cached schedule
-                                if (savedSchedule) {
-                                    displaySchedule(savedSchedule);
-                                    loadingMessage.textContent = 'Showing cached schedule. Click "Get Schedule" for latest data.';
-                                }
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Error loading saved state:', error);
-                    }
+                    loadGroups(savedFacultyId);
                 }
-            }
+            });
 
-            facultySelect.addEventListener('change', async (e) => {
-                const facultyId = e.target.value;
-                if (!facultyId) return;
-
-                saveToStorage('selectedFaculty', facultyId);
+            async function loadGroups(facultyId) {
                 loadingMessage.textContent = 'Loading groups...';
                 try {
                     const result = await fetchFromApi('/buttonClicked', {
@@ -466,10 +418,26 @@
                         option.textContent = group.Name;
                         groupSelect.appendChild(option);
                     });
+                    
+                    const savedGroupId = loadFromStorage('selectedGroup');
+                    if (savedGroupId) {
+                        groupSelect.value = savedGroupId;
+                        await loadSchedule(savedGroupId);
+                    }
+                    
                     loadingMessage.textContent = '';
                 } catch (error) {
-                    loadingMessage.textContent = 'Error loading groups. Please try refreshing the page.';
-                    console.error(error);
+                    console.error('Error loading groups:', error);
+                    loadingMessage.textContent = 'Error loading groups. Please try again.';
+                }
+            }
+
+            // Event Listeners
+            facultySelect.addEventListener('change', (e) => {
+                const facultyId = e.target.value;
+                if (facultyId) {
+                    saveToStorage('selectedFaculty', facultyId);
+                    loadGroups(facultyId);
                 }
             });
 
