@@ -359,22 +359,61 @@
                 return data ? JSON.parse(data) : null;
             }
 
-            // Constants with CORS proxy
-            const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
-            const API_BASE = encodeURIComponent('http://schedule.mslu.by/backend');
-            const SITE_URL = encodeURIComponent('http://schedule.mslu.by');
+            // Constants with proper URL handling
+            const API_BASE = 'http://schedule.mslu.by/backend';
 
             async function fetchFromApi(endpoint, params = {}) {
                 const queryString = Object.entries(params)
                     .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
                     .join('&');
-                const url = `${CORS_PROXY}${API_BASE}${endpoint}?${queryString}`;
+                const url = `${API_BASE}${endpoint}?${queryString}`;
                 
                 try {
+                    // If we're on HTTPS, use a form-based request in an iframe
+                    if (window.location.protocol === 'https:') {
+                        return new Promise((resolve) => {
+                            const iframe = document.createElement('iframe');
+                            iframe.style.display = 'none';
+                            document.body.appendChild(iframe);
+
+                            iframe.contentWindow.document.open();
+                            iframe.contentWindow.document.write(`
+                                <form method="GET" action="${url}"></form>
+                                <script>
+                                    document.forms[0].submit();
+                                    window.onmessage = (event) => {
+                                        if (event.data === 'getResponse') {
+                                            window.parent.postMessage(document.body.textContent, '*');
+                                        }
+                                    };
+                                </script>
+                            `);
+                            iframe.contentWindow.document.close();
+
+                            const handler = (event) => {
+                                try {
+                                    const data = JSON.parse(event.data);
+                                    document.body.removeChild(iframe);
+                                    window.removeEventListener('message', handler);
+                                    resolve(data);
+                                } catch (e) {
+                                    // Ignore non-JSON messages
+                                }
+                            };
+
+                            window.addEventListener('message', handler);
+                            
+                            // Request the response after a short delay
+                            setTimeout(() => {
+                                iframe.contentWindow.postMessage('getResponse', '*');
+                            }, 1000);
+                        });
+                    }
+                    
+                    // If we're on HTTP, just do a regular fetch
                     const response = await fetch(url);
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                    const data = await response.json();
-                    return data;
+                    return response.json();
                 } catch (error) {
                     console.error('API fetch error:', error);
                     throw error;
@@ -406,6 +445,10 @@
                         educationForm: 1
                     });
                     
+                    if (!result || !result.data) {
+                        throw new Error('Invalid response format');
+                    }
+                    
                     groupSelect.innerHTML = '<option value="">Select Group</option>';
                     result.data.forEach(group => {
                         const option = document.createElement('option');
@@ -430,17 +473,12 @@
             async function loadFaculties() {
                 loadingMessage.textContent = 'Loading faculties...';
                 try {
-                    const response = await fetch(`${CORS_PROXY}${SITE_URL}`);
-                    if (!response.ok) throw new Error('Failed to load faculties');
-                    const html = await response.text();
-                    
-                    // Keep existing faculty options as fallback
+                    // Just use the hardcoded faculty list
                     const savedFacultyId = loadFromStorage('selectedFaculty');
                     if (savedFacultyId) {
                         facultySelect.value = savedFacultyId;
                         await loadGroups(savedFacultyId);
                     }
-                    
                     loadingMessage.textContent = '';
                 } catch (error) {
                     console.error('Failed to load faculties:', error);
@@ -534,10 +572,8 @@
                 scheduleContainer.innerHTML = html;
             }
 
-            // Load saved state after loading faculties
-            loadFaculties().then(() => {
-                loadSavedState();
-            });
+            // Just call loadFaculties once
+            loadFaculties();
         });
 
         // Debug menu toggle with Ctrl+Shift+D
@@ -559,7 +595,7 @@
                     
                     // Unregister service worker
                     if ('serviceWorker' in navigator) {
-                        const registrations = await navigator.serviceWorker.getRegistrations();
+                        const registrations = await navigator.getServiceWorker.getRegistrations();
                         await Promise.all(registrations.map(reg => reg.unregister()));
                     }
                     
