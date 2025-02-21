@@ -341,15 +341,16 @@
         updateOnlineStatus();
 
         document.addEventListener('DOMContentLoaded', () => {
+            // Update API endpoints to use CORS proxy
+            const API_BASE = 'https://corsproxy.io/?' + encodeURIComponent('http://schedule.mslu.by/backend');
+            const SITE_URL = 'https://corsproxy.io/?' + encodeURIComponent('http://schedule.mslu.by');
+            
             const facultySelect = document.getElementById('faculty');
             const groupSelect = document.getElementById('group');
             const weekTypeSelect = document.getElementById('weekType');
             const getScheduleBtn = document.getElementById('getSchedule');
             const scheduleContainer = document.getElementById('schedule');
             const loadingMessage = document.getElementById('loadingMessage');
-
-            const API_BASE = 'https://schedule.mslu.by/backend';
-            const SITE_URL = 'https://schedule.mslu.by';
 
             async function loadFaculties() {
                 loadingMessage.textContent = 'Loading faculties...';
@@ -395,7 +396,6 @@
                     
                 const response = await fetch(`${API_BASE}${endpoint}?${queryString}`, {
                     method: 'GET',
-                    mode: 'cors',
                     headers: {
                         'accept': '*/*',
                         'accept-language': 'en,en-GB;q=0.9,en-US;q=0.8,ru;q=0.7'
