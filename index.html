@@ -9,11 +9,11 @@
     <meta name="application-name" content="MSLU Schedule">
     
     <!-- Icons with absolute paths -->
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/mslu-schedule/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/mslu-schedule/icon-512.png">
     
     <!-- Manifest with absolute path -->
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="/mslu-schedule/manifest.json">
     <title>MSLU Schedule</title>
     <style>
         .container {
@@ -288,10 +288,10 @@
     </div>
 
     <script>
-        // Update service worker registration
+        // Update service worker registration with correct path
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js', {scope: './'})
+                navigator.serviceWorker.register('/mslu-schedule/sw.js', {scope: '/mslu-schedule/'})
                     .then(registration => console.log('ServiceWorker registration successful'))
                     .catch(err => console.log('ServiceWorker registration failed:', err));
             });

@@ -1,10 +1,12 @@
 const CACHE_NAME = 'mslu-schedule-v1';
 const STATIC_CACHE = [
-    './',
-    './index.html',
-    './manifest.json',
-    './icon-192.png',
-    './icon-512.png'
+    '/mslu-schedule/',
+    '/mslu-schedule/index.html',
+    '/mslu-schedule/manifest.json',
+    '/mslu-schedule/icon-192.png',
+    '/mslu-schedule/icon-512.png',
+    '/mslu-schedule/icon-maskable-192.png',
+    '/mslu-schedule/icon-maskable-512.png'
 ];
 
 const API_CACHE = new Set();  // To track API URLs we've cached

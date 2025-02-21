@@ -7,5 +7,10 @@
     },
     "liveServer.settings.mount": [
         ["/", "./"]
-    ]
+    ],
+    "liveServer.settings.donotShowInfoMsg": true,
+    "liveServer.settings.donotVerifyTags": true,
+    "liveServer.settings.https.cert": "",
+    "liveServer.settings.https.key": "",
+    "liveServer.settings.host": "local.dev"
 }
