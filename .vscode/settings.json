@@ -1,0 +1,11 @@
+{
+    "liveServer.settings.https": true,
+    "liveServer.settings.file": "404.html",
+    "liveServer.settings.root": "/",
+    "liveServer.settings.CustomMimeTypes": {
+        "png": "image/png"
+    },
+    "liveServer.settings.mount": [
+        ["/", "./"]
+    ]
+}

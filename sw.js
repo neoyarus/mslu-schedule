@@ -1,0 +1,60 @@
+const CACHE_NAME = 'mslu-schedule-v1';
+const STATIC_CACHE = [
+    './',
+    './index.html',
+    './manifest.json',
+    './icon-192.png',
+    './icon-512.png'
+];
+
+const API_CACHE = new Set();  // To track API URLs we've cached
+
+self.addEventListener('install', (event) => {
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then((cache) => cache.addAll(STATIC_CACHE))
+    );
+});
+
+self.addEventListener('fetch', (event) => {
+    const url = new URL(event.request.url);
+
+    // Handle API requests differently
+    if (url.origin === 'http://schedule.mslu.by') {
+        event.respondWith(
+            fetch(event.request)
+                .then(response => {
+                    // Cache the API response
+                    const responseToCache = response.clone();
+                    caches.open(CACHE_NAME).then(cache => {
+                        cache.put(event.request, responseToCache);
+                        API_CACHE.add(event.request.url);
+                    });
+                    return response;
+                })
+                .catch(() => {
+                    // If offline, try to return cached API response
+                    return caches.match(event.request);
+                })
+        );
+        return;
+    }
+
+    // Handle regular static files
+    event.respondWith(
+        caches.match(event.request)
+            .then((response) => {
+                if (response) {
+                    return response;  // Return cached version
+                }
+                return fetch(event.request);
+            })
+            .catch(() => {
+                // Return fallback content if offline and no cache
+                if (event.request.url.includes('favicon.ico')) {
+                    return new Response();  // Empty response for favicon
+                }
+                return caches.match('./index.html');  // Return cached index.html as fallback
+            })
+    );
+});

@@ -1,0 +1,2 @@
+AddType image/png .png
+Header set Service-Worker-Allowed "/"

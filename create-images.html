@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Generator</title>
+</head>
+<body>
+    <script>
+        function createAndDownloadImage(width, height, filename, isMaskable = false) {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            
+            // Fill with black
+            ctx.fillStyle = '#000000';
+            
+            if (isMaskable) {
+                // For maskable icons, add 10% padding
+                const padding = width * 0.1;
+                ctx.fillRect(padding, padding, width - (padding * 2), height - (padding * 2));
+            } else {
+                // For regular icons and screenshots, fill entire area
+                ctx.fillRect(0, 0, width, height);
+            }
+            
+            // Create download link
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        window.onload = () => {
+            // Regular icons
+            createAndDownloadImage(192, 192, 'icon-192.png');
+            createAndDownloadImage(512, 512, 'icon-512.png');
+            
+            // Maskable icons (with padding)
+            createAndDownloadImage(192, 192, 'icon-maskable-192.png', true);
+            createAndDownloadImage(512, 512, 'icon-maskable-512.png', true);
+            
+            // Screenshots
+            createAndDownloadImage(1280, 720, 'screenshot-desktop.png');
+            createAndDownloadImage(750, 1334, 'screenshot-mobile.png');
+        };
+    </script>
+</body>
+</html>

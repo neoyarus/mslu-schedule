@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="MSLU Schedule Viewer - View class schedules for MSLU">
+    <meta name="theme-color" content="#007bff">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="MSLU Schedule">
+    
+    <!-- Icons with absolute paths -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+    
+    <!-- Manifest with absolute path -->
+    <link rel="manifest" href="/manifest.json">
+    <title>MSLU Schedule</title>
+    <style>
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            width: 100%;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+        }
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        select {
+            padding: 8px;
+            min-width: 150px;
+            flex: 1;
+            min-width: 0;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+        }
+        .schedule-container {
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+        #loadingMessage {
+            color: #666;
+            margin: 10px 0;
+        }
+        .error {
+            color: red;
+            margin: 10px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            min-width: unset; /* Remove fixed min-width */
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            font-size: 14px;
+        }
+        th {
+            background-color: #f5f5f5;
+        }
+        .lesson {
+            margin-bottom: 5px;
+            padding: 5px;
+            background-color: #f9f9f9;
+        }
+
+        .day-header {
+            background-color: #007bff;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+            border: none;
+        }
+        
+        .lesson-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .lesson-name {
+            font-weight: bold;
+        }
+        
+        .lesson-teacher {
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        .time-room-cell {
+            text-align: center;
+            width: 100px;
+        }
+        
+        .time {
+            font-weight: bold;
+        }
+        
+        .room {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            .controls {
+                flex-direction: column;
+                gap: 8px;
+            }
+            select, button {
+                width: 100%;
+            }
+            th, td {
+                padding: 6px;
+                font-size: 13px;
+            }
+            h1 {
+                font-size: 1.5em;
+                margin: 10px 0;
+            }
+            .time-room-cell {
+                width: 80px;
+            }
+            
+            th, td {
+                padding: 8px;
+                font-size: 14px;
+            }
+        }
+
+        /* Make text more readable on small screens */
+        @media (max-width: 480px) {
+            th, td {
+                padding: 4px;
+                font-size: 12px;
+            }
+        }
+
+        .install-prompt {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 1000;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .offline-notice {
+            background-color: #ff9800;
+            color: white;
+            text-align: center;
+            padding: 8px;
+            display: none;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .debug-menu {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: none;
+            max-width: 80vw;
+            word-wrap: break-word;
+            bottom: 70px; /* Position above the trigger button */
+        }
+
+        .debug-menu.visible {
+            display: block;
+        }
+
+        .debug-menu button {
+            background: #dc3545;
+            margin: 5px 0;
+            font-size: 12px;
+            padding: 4px 8px;
+            width: 100%;
+            white-space: normal;
+            min-height: 44px; /* Better touch target */
+        }
+
+        .debug-trigger {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            cursor: pointer;
+            z-index: 999;
+            opacity: 0.7;
+        }
+
+        .debug-trigger:hover {
+            opacity: 1;
+        }
+
+        @media (max-width: 768px) {
+            .debug-menu {
+                top: auto;
+                bottom: 20px;
+                right: 20px;
+                left: 20px;
+                width: auto;
+            }
+            .debug-trigger {
+                width: 40px;
+                height: 40px;
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button id="debugTrigger" class="debug-trigger" title="Debug Menu">⚙️</button>
+    <div id="offlineNotice" class="offline-notice">
+        You are offline. Showing cached data.
+    </div>
+    <div class="container">
+        <h1>MSLU Schedule Viewer</h1>
+        <div class="controls">
+            <select id="faculty">
+                <option value="">Select Faculty</option>
+                <option value="202">Faculty of Translation and Interpreting</option>
+                <option value="203">Faculty of Foreign Languages</option>
+                <option value="204">Faculty of Intercultural Communications</option>
+                <option value="206">Faculty of German Language</option>
+                <option value="212">Preparatory Department</option>
+                <option value="213">Institute of Advanced Training and Retraining</option>
+            </select>
+            <select id="group">
+                <option value="">Select Group</option>
+            </select>
+            <select id="weekType">
+                <option value="currentWeek">Current Week</option>
+                <option value="nextWeek">Next Week</option>
+            </select>
+            <button id="getSchedule">Get Schedule</button>
+        </div>
+        <div id="loadingMessage"></div>
+        <div id="schedule" class="schedule-container"></div>
+    </div>
+
+    <div id="installPrompt" class="install-prompt">
+        Install App
+    </div>
+
+    <div id="debugMenu" class="debug-menu">
+        <button id="forceReload">Force Reload (Clear Cache)</button>
+    </div>
+
+    <script>
+        // Update service worker registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js', {scope: './'})
+                    .then(registration => console.log('ServiceWorker registration successful'))
+                    .catch(err => console.log('ServiceWorker registration failed:', err));
+            });
+        }
+
+        // Update install prompt handling
+        let deferredPrompt;
+        const installPrompt = document.getElementById('installPrompt');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installPrompt.style.display = 'block';
+        });
+
+        installPrompt.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    console.log('App installed');
+                }
+                deferredPrompt = null;
+                installPrompt.style.display = 'none';
+            }
+        });
+
+        // Hide install prompt if app is installed
+        window.addEventListener('appinstalled', () => {
+            installPrompt.style.display = 'none';
+        });
+
+        // Add offline detection
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        
+        function updateOnlineStatus() {
+            const offlineNotice = document.getElementById('offlineNotice');
+            if (!navigator.onLine) {
+                offlineNotice.style.display = 'block';
+            } else {
+                offlineNotice.style.display = 'none';
+            }
+        }
+
+        // Initial check
+        updateOnlineStatus();
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const facultySelect = document.getElementById('faculty');
+            const groupSelect = document.getElementById('group');
+            const weekTypeSelect = document.getElementById('weekType');
+            const getScheduleBtn = document.getElementById('getSchedule');
+            const scheduleContainer = document.getElementById('schedule');
+            const loadingMessage = document.getElementById('loadingMessage');
+
+            const API_BASE = 'http://schedule.mslu.by/backend';
+            const SITE_URL = 'http://schedule.mslu.by';
+
+            async function loadFaculties() {
+                loadingMessage.textContent = 'Loading faculties...';
+                try {
+                    // Fetch the main page
+                    const response = await fetch(SITE_URL);
+                    const html = await response.text();
+                    
+                    // Create a temporary element to parse the HTML
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    
+                    // Find the faculty select element in the parsed HTML
+                    const facultyOptions = doc.querySelectorAll('#ctl00_ContentPlaceHolder1_ddlFaculty option');
+                    
+                    // Clear existing options except the first one
+                    facultySelect.innerHTML = '<option value="">Select Faculty</option>';
+                    
+                    // Add each faculty from the site
+                    facultyOptions.forEach(option => {
+                        if (option.value) {  // Skip empty values
+                            const newOption = document.createElement('option');
+                            newOption.value = option.value;
+                            newOption.textContent = option.textContent.trim();
+                            facultySelect.appendChild(newOption);
+                        }
+                    });
+                    
+                    loadingMessage.textContent = '';
+                } catch (error) {
+                    loadingMessage.textContent = 'Error loading faculties. Using fallback data.';
+                    console.error('Failed to load faculties:', error);
+                }
+            }
+
+            // Load faculties when page loads
+            loadFaculties();
+
+            async function fetchFromApi(endpoint, params = {}) {
+                const queryString = Object.entries(params)
+                    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+                    .join('&');
+                    
+                const response = await fetch(`${API_BASE}${endpoint}?${queryString}`, {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: {
+                        'accept': '*/*',
+                        'accept-language': 'en,en-GB;q=0.9,en-US;q=0.8,ru;q=0.7'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const data = await response.json();
+                return data;
+            }
+
+            // Add storage functions
+            function saveToStorage(key, value) {
+                localStorage.setItem(key, JSON.stringify(value));
+            }
+
+            function loadFromStorage(key) {
+                const data = localStorage.getItem(key);
+                return data ? JSON.parse(data) : null;
+            }
+
+            async function loadSavedState() {
+                const savedFacultyId = loadFromStorage('selectedFaculty');
+                const savedGroupId = loadFromStorage('selectedGroup');
+                const savedSchedule = loadFromStorage('lastSchedule');
+
+                if (savedFacultyId) {
+                    facultySelect.value = savedFacultyId;
+                    // Load groups for this faculty
+                    try {
+                        const result = await fetchFromApi('/buttonClicked', {
+                            facultyId: savedFacultyId,
+                            educationForm: 1
+                        });
+                        
+                        groupSelect.innerHTML = '<option value="">Select Group</option>';
+                        result.data.forEach(group => {
+                            const option = document.createElement('option');
+                            option.value = group.IdGroup;
+                            option.textContent = group.Name;
+                            groupSelect.appendChild(option);
+                        });
+
+                        if (savedGroupId) {
+                            groupSelect.value = savedGroupId;
+                            // Try to load fresh schedule
+                            try {
+                                const result = await fetchFromApi('/', {
+                                    groupId: savedGroupId,
+                                    weekType: weekTypeSelect.value
+                                });
+                                displaySchedule(result.data);
+                                saveToStorage('lastSchedule', result.data);
+                            } catch (error) {
+                                // If server fetch fails, use cached schedule
+                                if (savedSchedule) {
+                                    displaySchedule(savedSchedule);
+                                    loadingMessage.textContent = 'Showing cached schedule. Click "Get Schedule" for latest data.';
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error loading saved state:', error);
+                    }
+                }
+            }
+
+            facultySelect.addEventListener('change', async (e) => {
+                const facultyId = e.target.value;
+                if (!facultyId) return;
+
+                saveToStorage('selectedFaculty', facultyId);
+                loadingMessage.textContent = 'Loading groups...';
+                try {
+                    const result = await fetchFromApi('/buttonClicked', {
+                        facultyId: facultyId,
+                        educationForm: 1
+                    });
+                    
+                    groupSelect.innerHTML = '<option value="">Select Group</option>';
+                    result.data.forEach(group => {
+                        const option = document.createElement('option');
+                        option.value = group.IdGroup;
+                        option.textContent = group.Name;
+                        groupSelect.appendChild(option);
+                    });
+                    loadingMessage.textContent = '';
+                } catch (error) {
+                    loadingMessage.textContent = 'Error loading groups. Please try refreshing the page.';
+                    console.error(error);
+                }
+            });
+
+            groupSelect.addEventListener('change', (e) => {
+                const groupId = e.target.value;
+                if (groupId) {
+                    saveToStorage('selectedGroup', groupId);
+                }
+            });
+
+            getScheduleBtn.addEventListener('click', async () => {
+                const groupId = groupSelect.value;
+                const weekType = weekTypeSelect.value;
+
+                if (!groupId) {
+                    alert('Please select a group');
+                    return;
+                }
+
+                loadingMessage.textContent = 'Loading schedule...';
+                try {
+                    const result = await fetchFromApi('/', {
+                        groupId: groupId,
+                        weekType: weekType
+                    });
+                    displaySchedule(result.data);
+                    saveToStorage('lastSchedule', result.data);
+                    loadingMessage.textContent = '';
+                } catch (error) {
+                    loadingMessage.textContent = 'Error loading schedule. Please try refreshing the page.';
+                    console.error(error);
+                }
+            });
+
+            function displaySchedule(schedule) {
+                const days = {
+                    1: 'Monday',
+                    2: 'Tuesday',
+                    3: 'Wednesday',
+                    4: 'Thursday',
+                    5: 'Friday',
+                    6: 'Saturday'
+                };
+
+                const scheduleByDay = {};
+                schedule.forEach(lesson => {
+                    if (!scheduleByDay[lesson.DayNumber]) {
+                        scheduleByDay[lesson.DayNumber] = [];
+                    }
+                    scheduleByDay[lesson.DayNumber].push(lesson);
+                });
+
+                let html = '<table>';
+
+                Object.entries(days).forEach(([dayNum, dayName]) => {
+                    const dayLessons = scheduleByDay[dayNum] || [];
+                    if (dayLessons.length > 0) {
+                        html += `<tr><td colspan="2" class="day-header">${dayName}</td></tr>`;
+                        dayLessons.sort((a, b) => a.Lesson - b.Lesson);
+                        dayLessons.forEach(lesson => {
+                            html += `
+                                <tr>
+                                    <td class="time-room-cell">
+                                        <div class="time">${lesson.TimeIn.substring(0, 5)}<br>${lesson.TimeOut.substring(0, 5)}</div>
+                                        <div class="room">${lesson.Classroom}</div>
+                                    </td>
+                                    <td class="lesson-cell">
+                                        <div class="lesson-name">${lesson.Discipline} (${lesson.Discipline_Type})</div>
+                                        <div class="lesson-teacher">${lesson.FIO_teacher}</div>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                    }
+                });
+
+                html += '</table>';
+                scheduleContainer.innerHTML = html;
+            }
+
+            // Load saved state after loading faculties
+            loadFaculties().then(() => {
+                loadSavedState();
+            });
+        });
+
+        // Debug menu toggle with Ctrl+Shift+D
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+                const debugMenu = document.getElementById('debugMenu');
+                debugMenu.classList.toggle('visible');
+                e.preventDefault();
+            }
+        });
+
+        // Force reload function
+        document.getElementById('forceReload').addEventListener('click', async () => {
+            if ('caches' in window) {
+                try {
+                    // Delete all caches
+                    const cacheKeys = await caches.keys();
+                    await Promise.all(cacheKeys.map(key => caches.delete(key)));
+                    
+                    // Unregister service worker
+                    if ('serviceWorker' in navigator) {
+                        const registrations = await navigator.serviceWorker.getRegistrations();
+                        await Promise.all(registrations.map(reg => reg.unregister()));
+                    }
+                    
+                    // Reload with cache bust parameter
+                    window.location.href = window.location.href.split('?')[0] + 
+                        '?cache=' + Date.now();
+                } catch (error) {
+                    console.error('Error clearing cache:', error);
+                }
+            }
+        });
+
+        // Replace the long press code with a simple click handler
+        const debugTrigger = document.getElementById('debugTrigger');
+        const debugMenu = document.getElementById('debugMenu');
+
+        debugTrigger.addEventListener('click', () => {
+            debugMenu.classList.toggle('visible');
+        });
+
+        // Keep the keyboard shortcut as an alternative
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+                debugMenu.classList.toggle('visible');
+                e.preventDefault();
+            }
+        });
+
+        // ...rest of your existing code...
+    </script>
+</body>
+</html>
