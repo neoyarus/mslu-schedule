@@ -341,7 +341,7 @@
         updateOnlineStatus();
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Move all DOM element references to the top
+            // Move DOM references and constants to the top
             const facultySelect = document.getElementById('faculty');
             const groupSelect = document.getElementById('group');
             const weekTypeSelect = document.getElementById('weekType');
@@ -349,15 +349,26 @@
             const scheduleContainer = document.getElementById('schedule');
             const loadingMessage = document.getElementById('loadingMessage');
 
-            // Constants
-            const API_BASE = 'http://schedule.mslu.by/backend';
-            const SITE_URL = 'http://schedule.mslu.by';
+            // Add storage functions at the start
+            function saveToStorage(key, value) {
+                localStorage.setItem(key, JSON.stringify(value));
+            }
+
+            function loadFromStorage(key) {
+                const data = localStorage.getItem(key);
+                return data ? JSON.parse(data) : null;
+            }
+
+            // Constants with CORS proxy
+            const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+            const API_BASE = encodeURIComponent('http://schedule.mslu.by/backend');
+            const SITE_URL = encodeURIComponent('http://schedule.mslu.by');
 
             async function fetchFromApi(endpoint, params = {}) {
                 const queryString = Object.entries(params)
                     .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
                     .join('&');
-                const url = `${API_BASE}${endpoint}?${queryString}`;
+                const url = `${CORS_PROXY}${API_BASE}${endpoint}?${queryString}`;
                 
                 try {
                     const response = await fetch(url);
@@ -370,38 +381,22 @@
                 }
             }
 
-            async function loadFaculties() {
-                loadingMessage.textContent = 'Loading faculties...';
+            async function loadSchedule(groupId) {
                 try {
-                    const response = await fetch(`${SITE_URL}/backend/getFaculties`);
-                    if (!response.ok) throw new Error('Failed to load faculties');
-                    const data = await response.json();
-                    
-                    groupSelect.innerHTML = '<option value="">Select Group</option>';
-                    facultySelect.innerHTML = '<option value="">Select Faculty</option>';
-                    
-                    data.forEach(faculty => {
-                        const option = document.createElement('option');
-                        option.value = faculty.id;
-                        option.textContent = faculty.name;
-                        facultySelect.appendChild(option);
+                    const result = await fetchFromApi('/', {
+                        groupId: groupId,
+                        weekType: weekTypeSelect.value
                     });
-                    
-                    loadingMessage.textContent = '';
+                    displaySchedule(result.data);
+                    saveToStorage('lastSchedule', result.data);
                 } catch (error) {
-                    console.error('Failed to load faculties:', error);
-                    loadingMessage.textContent = 'Error loading faculties. Using fallback data.';
+                    const savedSchedule = loadFromStorage('lastSchedule');
+                    if (savedSchedule) {
+                        displaySchedule(savedSchedule);
+                        loadingMessage.textContent = 'Showing cached schedule. Click "Get Schedule" for latest data.';
+                    }
                 }
             }
-
-            // Load saved state after loading faculties
-            loadFaculties().then(() => {
-                const savedFacultyId = loadFromStorage('selectedFaculty');
-                if (savedFacultyId) {
-                    facultySelect.value = savedFacultyId;
-                    loadGroups(savedFacultyId);
-                }
-            });
 
             async function loadGroups(facultyId) {
                 loadingMessage.textContent = 'Loading groups...';
@@ -429,6 +424,27 @@
                 } catch (error) {
                     console.error('Error loading groups:', error);
                     loadingMessage.textContent = 'Error loading groups. Please try again.';
+                }
+            }
+
+            async function loadFaculties() {
+                loadingMessage.textContent = 'Loading faculties...';
+                try {
+                    const response = await fetch(`${CORS_PROXY}${SITE_URL}`);
+                    if (!response.ok) throw new Error('Failed to load faculties');
+                    const html = await response.text();
+                    
+                    // Keep existing faculty options as fallback
+                    const savedFacultyId = loadFromStorage('selectedFaculty');
+                    if (savedFacultyId) {
+                        facultySelect.value = savedFacultyId;
+                        await loadGroups(savedFacultyId);
+                    }
+                    
+                    loadingMessage.textContent = '';
+                } catch (error) {
+                    console.error('Failed to load faculties:', error);
+                    loadingMessage.textContent = 'Using cached faculty data.';
                 }
             }
 
