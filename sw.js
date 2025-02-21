@@ -45,6 +45,29 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    if (url.hostname === 'api.allorigins.win') {
+        event.respondWith(
+            fetch(event.request)
+                .then(response => {
+                    // Cache the API response
+                    const responseToCache = response.clone();
+                    caches.open(CACHE_NAME).then(cache => {
+                        cache.put(event.request, responseToCache);
+                        API_CACHE.add(event.request.url);
+                    });
+                    return response;
+                })
+                .catch(() => {
+                    // If offline, try to return cached API response
+                    return caches.match(event.request)
+                        .then(response => response || new Response(JSON.stringify({ error: 'Offline' }), {
+                            headers: { 'Content-Type': 'application/json' }
+                        }));
+                })
+        );
+        return;
+    }
+
     if (url.origin === 'https://schedule.mslu.by') {
         event.respondWith(
             fetch(event.request)

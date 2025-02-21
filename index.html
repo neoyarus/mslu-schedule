@@ -341,9 +341,13 @@
         updateOnlineStatus();
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Update API endpoints to use CORS proxy
-            const API_BASE = 'https://corsproxy.io/?' + encodeURIComponent('http://schedule.mslu.by/backend');
-            const SITE_URL = 'https://corsproxy.io/?' + encodeURIComponent('http://schedule.mslu.by');
+            // Update API endpoints to use CORS proxy with base64 encoding for better compatibility
+            function createProxyUrl(url) {
+                return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+            }
+            
+            const API_BASE = 'http://schedule.mslu.by/backend';
+            const SITE_URL = 'http://schedule.mslu.by';
             
             const facultySelect = document.getElementById('faculty');
             const groupSelect = document.getElementById('group');
@@ -355,8 +359,7 @@
             async function loadFaculties() {
                 loadingMessage.textContent = 'Loading faculties...';
                 try {
-                    // Fetch the main page
-                    const response = await fetch(SITE_URL);
+                    const response = await fetch(createProxyUrl(SITE_URL));
                     const html = await response.text();
                     
                     // Create a temporary element to parse the HTML
@@ -394,11 +397,12 @@
                     .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
                     .join('&');
                     
-                const response = await fetch(`${API_BASE}${endpoint}?${queryString}`, {
+                const url = `${API_BASE}${endpoint}?${queryString}`;
+                const response = await fetch(createProxyUrl(url), {
                     method: 'GET',
                     headers: {
                         'accept': '*/*',
-                        'accept-language': 'en,en-GB;q=0.9,en-US;q=0.8,ru;q=0.7'
+                        'accept-language': 'en,en-GB;q=0.9'
                     }
                 });
 
