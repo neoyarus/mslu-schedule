@@ -341,114 +341,45 @@
         updateOnlineStatus();
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Update API endpoints to use alternative CORS proxies
-            function createProxyUrl(url) {
-                // Try multiple CORS proxies in case one fails
-                const proxies = [
-                    `https://cors.io/?${url}`,
-                    `https://api.codetabs.com/v1/proxy?quest=${url}`,
-                    `https://cors-anywhere.herokuapp.com/${url}`
-                ];
-                return proxies[0]; // Start with first proxy
-            }
-            
+            // Use HTTP explicitly for API endpoints
             const API_BASE = 'http://schedule.mslu.by/backend';
             const SITE_URL = 'http://schedule.mslu.by';
 
-            async function fetchWithRetry(url, options = {}, retries = 3) {
-                for (let i = 0; i < retries; i++) {
-                    try {
-                        const response = await fetch(url, {
-                            ...options,
-                            headers: {
-                                'accept': '*/*',
-                                'accept-language': 'en,en-GB;q=0.9',
-                                'origin': 'https://neoyarus.github.io',
-                                ...options.headers
-                            },
-                            timeout: 5000 // 5 second timeout
-                        });
-                        
-                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                        return response;
-                    } catch (error) {
-                        if (i === retries - 1) throw error;
-                        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
-                    }
-                }
-            }
-
             async function fetchFromApi(endpoint, params = {}) {
                 const queryString = Object.entries(params)
                     .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
                     .join('&');
                         
                 const url = `${API_BASE}${endpoint}?${queryString}`;
-                try {
-                    const response = await fetchWithRetry(createProxyUrl(url));
-                    const data = await response.json();
-                    return data;
-                } catch (error) {
-                    console.error('API fetch error:', error);
-                    // Try to load from cache if fetch fails
-                    const cachedData = loadFromStorage(`cache_${endpoint}_${queryString}`);
-                    if (cachedData) {
-                        return cachedData;
-                    }
-                    throw error;
-                }
-            }
-
-            const facultySelect = document.getElementById('faculty');
-            const groupSelect = document.getElementById('group');
-            const weekTypeSelect = document.getElementById('weekType');
-            const getScheduleBtn = document.getElementById('getSchedule');
-            const scheduleContainer = document.getElementById('schedule');
-            const loadingMessage = document.getElementById('loadingMessage');
-
-            async function loadFaculties() {
-                loadingMessage.textContent = 'Loading faculties...';
-                try {
-                    const response = await fetch(createProxyUrl(SITE_URL));
-                    const html = await response.text();
-                    
-                    // Create a temporary element to parse the HTML
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    
-                    // Find the faculty select element in the parsed HTML
-                    const facultyOptions = doc.querySelectorAll('#ctl00_ContentPlaceHolder1_ddlFaculty option');
-                    
-                    // Clear existing options except the first one
-                    facultySelect.innerHTML = '<option value="">Select Faculty</option>';
-                    
-                    // Add each faculty from the site
-                    facultyOptions.forEach(option => {
-                        if (option.value) {  // Skip empty values
-                            const newOption = document.createElement('option');
-                            newOption.value = option.value;
-                            newOption.textContent = option.textContent.trim();
-                            facultySelect.appendChild(newOption);
-                        }
+                
+                // For HTTP requests from HTTPS page, use a simple form submission in an iframe
+                if (window.location.protocol === 'https:') {
+                    return new Promise((resolve, reject) => {
+                        const iframe = document.createElement('iframe');
+                        iframe.style.display = 'none';
+                        document.body.appendChild(iframe);
+                        
+                        const form = iframe.contentDocument.createElement('form');
+                        form.method = 'GET';
+                        form.action = url;
+                        
+                        iframe.contentDocument.body.appendChild(form);
+                        form.submit();
+                        
+                        iframe.onload = async () => {
+                            try {
+                                const response = iframe.contentDocument.body.textContent;
+                                document.body.removeChild(iframe);
+                                resolve(JSON.parse(response));
+                            } catch (error) {
+                                reject(error);
+                            }
+                        };
                     });
-                    
-                    loadingMessage.textContent = '';
-                } catch (error) {
-                    loadingMessage.textContent = 'Error loading faculties. Using fallback data.';
-                    console.error('Failed to load faculties:', error);
                 }
-            }
-
-            // Load faculties when page loads
-            loadFaculties();
-
-            async function fetchFromApi(endpoint, params = {}) {
-                const queryString = Object.entries(params)
-                    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
-                    .join('&');
-                    
-                const url = `${API_BASE}${endpoint}?${queryString}`;
-                const response = await fetch(createProxyUrl(url), {
+                
+                // If we're on HTTP already, just do a regular fetch
+                const response = await fetch(url, {
                     method: 'GET',
                     headers: {
                         'accept': '*/*',
@@ -456,12 +387,8 @@
                     }
                 });
 
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-
-                const data = await response.json();
-                return data;
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
             }
 
             // Add storage functions

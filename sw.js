@@ -112,6 +112,22 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // Handle HTTP requests to schedule.mslu.by
+    if (url.hostname === 'schedule.mslu.by') {
+        event.respondWith(
+            fetch(event.request, { mode: 'no-cors' })
+                .then(response => {
+                    const responseToCache = response.clone();
+                    caches.open(CACHE_NAME).then(cache => {
+                        cache.put(event.request, responseToCache);
+                    });
+                    return response;
+                })
+                .catch(() => caches.match(event.request))
+        );
+        return;
+    }
+
     // Handle regular static files
     event.respondWith(
         caches.match(event.request)
