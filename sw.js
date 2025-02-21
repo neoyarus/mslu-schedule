@@ -22,7 +22,7 @@ self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
     // Handle API requests differently
-    if (url.origin === 'http://schedule.mslu.by') {
+    if (url.origin === 'https://schedule.mslu.by') {
         event.respondWith(
             fetch(event.request)
                 .then(response => {

@@ -10,14 +10,14 @@
     "theme_color": "#007bff",
     "screenshots": [
         {
-            "src": "screenshot-desktop.png",
+            "src": "/mslu-schedule/screenshot-desktop.png",
             "sizes": "1280x720",
             "type": "image/png",
             "form_factor": "wide",
             "label": "Desktop view of MSLU Schedule"
         },
         {
-            "src": "screenshot-mobile.png",
+            "src": "/mslu-schedule/screenshot-mobile.png",
             "sizes": "750x1334",
             "type": "image/png",
             "label": "Mobile view of MSLU Schedule"
