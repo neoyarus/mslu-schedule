@@ -22,6 +22,30 @@ self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
     // Handle API requests differently
+    if (url.hostname.includes('cors.io') || 
+        url.hostname.includes('codetabs.com') || 
+        url.hostname.includes('cors-anywhere.herokuapp.com')) {
+        event.respondWith(
+            fetch(event.request)
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const responseToCache = response.clone();
+                    caches.open(CACHE_NAME).then(cache => {
+                        cache.put(event.request, responseToCache);
+                        API_CACHE.add(event.request.url);
+                    });
+                    return response;
+                })
+                .catch(() => {
+                    return caches.match(event.request)
+                        .then(response => response || new Response(JSON.stringify({ error: 'Offline' }), {
+                            headers: { 'Content-Type': 'application/json' }
+                        }));
+                })
+        );
+        return;
+    }
+
     if (url.hostname === 'corsproxy.io') {
         event.respondWith(
             fetch(event.request)

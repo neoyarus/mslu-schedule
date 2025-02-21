@@ -341,14 +341,64 @@
         updateOnlineStatus();
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Update API endpoints to use CORS proxy with base64 encoding for better compatibility
+            // Update API endpoints to use alternative CORS proxies
             function createProxyUrl(url) {
-                return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+                // Try multiple CORS proxies in case one fails
+                const proxies = [
+                    `https://cors.io/?${url}`,
+                    `https://api.codetabs.com/v1/proxy?quest=${url}`,
+                    `https://cors-anywhere.herokuapp.com/${url}`
+                ];
+                return proxies[0]; // Start with first proxy
             }
             
             const API_BASE = 'http://schedule.mslu.by/backend';
             const SITE_URL = 'http://schedule.mslu.by';
-            
+
+            async function fetchWithRetry(url, options = {}, retries = 3) {
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const response = await fetch(url, {
+                            ...options,
+                            headers: {
+                                'accept': '*/*',
+                                'accept-language': 'en,en-GB;q=0.9',
+                                'origin': 'https://neoyarus.github.io',
+                                ...options.headers
+                            },
+                            timeout: 5000 // 5 second timeout
+                        });
+                        
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                        return response;
+                    } catch (error) {
+                        if (i === retries - 1) throw error;
+                        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
+                    }
+                }
+            }
+
+            async function fetchFromApi(endpoint, params = {}) {
+                const queryString = Object.entries(params)
+                    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+                    .join('&');
+                        
+                const url = `${API_BASE}${endpoint}?${queryString}`;
+                try {
+                    const response = await fetchWithRetry(createProxyUrl(url));
+                    const data = await response.json();
+                    return data;
+                } catch (error) {
+                    console.error('API fetch error:', error);
+                    // Try to load from cache if fetch fails
+                    const cachedData = loadFromStorage(`cache_${endpoint}_${queryString}`);
+                    if (cachedData) {
+                        return cachedData;
+                    }
+                    throw error;
+                }
+            }
+
             const facultySelect = document.getElementById('faculty');
             const groupSelect = document.getElementById('group');
             const weekTypeSelect = document.getElementById('weekType');
